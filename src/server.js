@@ -85,6 +85,12 @@ app.use((err, _req, res, _next) => {
 // ----------------------------------------------------------
 const PORT = process.env.PORT || 3000;
 
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
+});
+
+
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
