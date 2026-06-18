@@ -32,7 +32,7 @@ const taskRoutes      = require('./routes/taskRoutes'); // Etapa 2
 const dashboardRoutes = require('./routes/dashboardRoutes'); // Etapa 3
 
 const app  = express();
-const PORT = process.env.PORT || 2511;
+
 
 // ----------------------------------------------------------
 // Middlewares globais
@@ -86,7 +86,7 @@ app.listen(PORT, () => {
   console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
 
-
+const PORT = process.env.PORT || 3000;
 
 // Só roda o listen se NÃO estiver na Vercel (ambiente local)
 if (process.env.NODE_ENV !== 'production') {
