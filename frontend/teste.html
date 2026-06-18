@@ -2,400 +2,751 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>TaskFlow — Console de Testes da API</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TaskFlow — Painel de tarefas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ============================================================
+     TOKENS — central de despacho: fundo escuro verde-petróleo,
+     acento âmbar de sinalização, mono para dados, expanded para
+     títulos. Cada status de tarefa tem uma cor própria e fixa.
+     ============================================================ */
   :root{
-    --bg:#0b0f0d; --panel:#10160f; --line:#1d2a1c; --ink:#d7e8d4; --dim:#5d7a5a;
-    --accent:#7ee08c; --accent-dim:#3a5c40; --warn:#e0c97e; --bad:#e08a7e; --blue:#7eb3e0;
+    --ink:        #101A16;
+    --panel:      #16221C;
+    --panel-2:    #1C2A23;
+    --line:       #2A3A32;
+    --paper:      #ECE6D8;
+    --faint:      #7C8C82;
+    --beacon:     #E8A23D;
+    --beacon-ink: #2B1B05;
+    --transit:    #4FA8A0;
+    --cleared:    #79B279;
+    --flag:       #D2604A;
+    --radius:     10px;
+    --font-display: 'Archivo Expanded', sans-serif;
+    --font-body:    'IBM Plex Sans', sans-serif;
+    --font-mono:    'IBM Plex Mono', monospace;
   }
+
   *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
   body{
-    background:var(--bg); color:var(--ink); margin:0; padding:32px;
-    font-family:'JetBrains Mono','Fira Code',Consolas,monospace; font-size:13px; line-height:1.5;
+    background:var(--ink); color:var(--paper); font-family:var(--font-body);
+    font-size:14px; line-height:1.5; min-height:100vh;
   }
-  h1{font-size:16px; letter-spacing:.5px; color:var(--accent); margin:0;}
-  .tag{color:var(--dim); font-size:12px;}
-  header{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:18px; flex-wrap:wrap; gap:8px;}
-  .grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
-  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
-  .panel{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px; margin-bottom:18px;}
-  .panel h2{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin:0 0 12px 0; border-bottom:1px solid var(--line); padding-bottom:8px;}
-  label{display:block; font-size:11px; color:var(--dim); margin:8px 0 3px;}
-  input,select,textarea{
-    width:100%; background:#070a06; border:1px solid var(--line); color:var(--ink);
-    padding:7px 8px; border-radius:4px; font-family:inherit; font-size:13px;
+  h1,h2,h3{font-family:var(--font-display); margin:0;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:var(--font-body);}
+  a{color:var(--beacon);}
+
+  :focus-visible{outline:2px solid var(--beacon); outline-offset:2px; border-radius:4px;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
   }
-  textarea{resize:vertical; min-height:50px;}
-  input:focus,select:focus,textarea:focus{outline:1px solid var(--accent);}
-  .row{display:flex; gap:8px;}
-  .row > *{flex:1;}
-  button{
-    background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent-dim);
-    padding:8px 14px; border-radius:4px; font-family:inherit; font-size:12px; cursor:pointer;
-    margin-top:10px;
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 24px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, var(--panel), var(--ink));
   }
-  button:hover{background:var(--accent); color:#06140a;}
-  button.ghost{background:transparent; border:1px solid var(--line); color:var(--dim);}
-  button.danger{background:#3a2020; border:1px solid #5c3a3a; color:var(--bad);}
-  button.danger:hover{background:var(--bad); color:#1a0a0a;}
-  button.small{padding:4px 8px; font-size:11px; margin:2px 2px 0 0;}
-  .status-pill{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; border:1px solid;}
-  .pendente{color:var(--warn); border-color:var(--warn);}
-  .em_andamento{color:var(--blue); border-color:var(--blue);}
-  .concluida{color:var(--accent); border-color:var(--accent);}
-  .baixa{color:var(--dim);} .media{color:var(--warn);} .alta{color:var(--bad);}
-  .task{border:1px solid var(--line); border-radius:5px; padding:10px; margin-bottom:8px; background:#0d130c;}
-  .task .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
-  .task .title{font-weight:bold; color:var(--ink);}
-  .task .meta{color:var(--dim); font-size:11px; margin-top:3px;}
-  .history-box{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:11px; color:var(--dim); display:none;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .wordmark{
+    font-family:var(--font-display); font-weight:800; font-size:18px;
+    letter-spacing:1.5px; text-transform:uppercase; color:var(--paper);
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--faint); flex-shrink:0;}
+  .dot.online{background:var(--cleared); box-shadow:0 0 8px var(--cleared);}
+  .dot.offline{background:var(--flag); box-shadow:0 0 8px var(--flag);}
+  .conn-label{font-family:var(--font-mono); font-size:11px; color:var(--faint); text-transform:uppercase; letter-spacing:.5px;}
+
+  .session{display:flex; align-items:center; gap:14px;}
+  .session .who{font-size:13px; color:var(--faint);}
+  .session .who b{color:var(--paper); font-weight:600;}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    border-radius:6px; border:1px solid var(--line); background:var(--panel-2);
+    color:var(--paper); padding:9px 16px; font-size:13px; font-weight:500;
+    cursor:pointer; transition:background .15s, border-color .15s, transform .05s;
+  }
+  .btn:hover{border-color:var(--beacon);}
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--beacon); color:var(--beacon-ink); border-color:var(--beacon); font-weight:600;}
+  .btn-primary:hover{background:#f0b25c;}
+  .btn-ghost{background:transparent;}
+  .btn-danger{background:transparent; border-color:#4a2c26; color:var(--flag);}
+  .btn-danger:hover{background:#2a1714; border-color:var(--flag);}
+  .btn-sm{padding:6px 11px; font-size:12px;}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  /* ---------- layout shells ---------- */
+  .view{max-width:920px; margin:0 auto; padding:28px 20px 64px;}
+  [hidden]{display:none !important;}
+
+  /* ---------- auth ---------- */
+  .auth-shell{display:flex; justify-content:center; padding-top:8vh;}
+  .auth-card{
+    width:100%; max-width:380px; background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); padding:28px 26px;
+  }
+  .auth-card h2{font-size:17px; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;}
+  .auth-sub{color:var(--faint); font-size:12px; margin:0 0 20px;}
+  .tabs{display:flex; gap:4px; margin-bottom:20px; background:var(--ink); border-radius:7px; padding:3px;}
+  .tab{flex:1; text-align:center; padding:8px; border-radius:5px; cursor:pointer; font-size:12.5px; color:var(--faint); font-weight:500;}
+  .tab.active{background:var(--panel-2); color:var(--paper);}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:11.5px; color:var(--faint); margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px;}
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--ink); border:1px solid var(--line); border-radius:6px;
+    color:var(--paper); padding:9px 11px; font-size:13.5px;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--beacon);}
+  .field textarea{resize:vertical; min-height:60px;}
+  .field-row{display:flex; gap:10px;}
+  .field-row > .field{flex:1;}
+
+  .alert{
+    border-radius:6px; padding:10px 12px; font-size:12.5px; margin-bottom:14px;
+    border:1px solid; line-height:1.4;
+  }
+  .alert-error{background:#2a1714; border-color:#4a2c26; color:#f0a08f;}
+  .alert-info{background:#15262a; border-color:#26424a; color:#9fd6e0;}
+
+  /* ---------- app shell ---------- */
+  .app-header{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px;}
+  .app-header h1{font-size:20px; text-transform:uppercase; letter-spacing:.5px;}
+  .app-header .eyebrow{font-family:var(--font-mono); font-size:11px; color:var(--faint); text-transform:uppercase;}
+
+  /* ---------- manifest strip (dashboard) ---------- */
+  .manifest{
+    display:grid; grid-template-columns:repeat(4, 1fr); background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-bottom:22px;
+  }
+  .manifest-cell{padding:16px 14px; border-right:1px dashed var(--line); position:relative;}
+  .manifest-cell:last-child{border-right:none;}
+  .manifest-num{font-family:var(--font-mono); font-size:28px; font-weight:600; line-height:1; color:var(--paper);}
+  .manifest-label{font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); margin-top:5px;}
+  .manifest-cell.flagged .manifest-num{color:var(--flag);}
+  @media (max-width:640px){
+    .manifest{grid-template-columns:repeat(2,1fr);}
+    .manifest-cell:nth-child(2){border-right:none;}
+    .manifest-cell:nth-child(1), .manifest-cell:nth-child(2){border-bottom:1px dashed var(--line);}
+  }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;}
+  .search-box{flex:1; min-width:160px; position:relative;}
+  .search-box input{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:6px;
+    color:var(--paper); padding:9px 11px 9px 30px; font-size:13.5px;
+  }
+  .search-box::before{
+    content:"⌕"; position:absolute; left:10px; top:50%; transform:translateY(-50%);
+    color:var(--faint); font-size:14px;
+  }
+
+  .filters-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+  }
+  @media (max-width:760px){.filters-panel{grid-template-columns:1fr 1fr;}}
+  .filters-panel .field{margin-bottom:0;}
+  .filters-footer{grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; margin-top:4px;}
+  .checkbox-line{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--faint);}
+  .checkbox-line input{width:auto;}
+
+  /* ---------- task form panel ---------- */
+  .form-panel{
+    background:var(--panel); border:1px solid var(--beacon); border-radius:var(--radius);
+    padding:18px; margin-bottom:18px;
+  }
+  .form-panel h3{font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--beacon); margin-bottom:14px;}
+  .form-actions{display:flex; gap:8px; margin-top:6px;}
+  .field-errors{font-size:11.5px; color:var(--flag); margin-top:4px;}
+
+  /* ---------- task list ---------- */
+  .task-list{display:flex; flex-direction:column; gap:0;}
+  .task-stub{
+    display:flex; gap:14px; padding:16px 4px; border-bottom:1px dashed var(--line);
+    align-items:flex-start;
+  }
+  .task-stub:last-child{border-bottom:none;}
+
+  .stamp{
+    font-family:var(--font-mono); font-size:9.5px; font-weight:600; letter-spacing:.5px;
+    text-transform:uppercase; border:2px solid; border-radius:5px; padding:5px 7px;
+    transform:rotate(-4deg); white-space:nowrap; flex-shrink:0; margin-top:2px;
+  }
+  .stamp.pendente{color:var(--beacon); border-color:var(--beacon);}
+  .stamp.em_andamento{color:var(--transit); border-color:var(--transit);}
+  .stamp.concluida{color:var(--cleared); border-color:var(--cleared);}
+  .stamp.pulse{animation:stamp-press .35s ease-out;}
+  @keyframes stamp-press{
+    0%{transform:rotate(-4deg) scale(1.6); opacity:.4;}
+    100%{transform:rotate(-4deg) scale(1); opacity:1;}
+  }
+
+  .task-body{flex:1; min-width:0;}
+  .task-title{font-size:14.5px; font-weight:600; color:var(--paper); word-break:break-word;}
+  .task-title.done{color:var(--faint); text-decoration:line-through;}
+  .task-desc{font-size:12.5px; color:var(--faint); margin-top:3px; word-break:break-word;}
+  .task-meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-family:var(--font-mono); font-size:11px; color:var(--faint);}
+  .task-meta .flag-icon{display:inline-flex; align-items:center; gap:4px;}
+  .priority-baixa{color:var(--faint);}
+  .priority-media{color:var(--beacon);}
+  .priority-alta{color:var(--flag); font-weight:600;}
+  .meta-overdue{color:var(--flag); font-weight:600;}
+
+  .task-controls{display:flex; flex-direction:column; gap:6px; align-items:flex-end; flex-shrink:0;}
+  .status-pills{display:flex; gap:4px;}
+  .pill{
+    font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.3px;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--faint);
+    border-radius:4px; padding:4px 7px; cursor:pointer;
+  }
+  .pill:hover{border-color:var(--beacon);}
+  .pill.current{background:var(--beacon); border-color:var(--beacon); color:var(--beacon-ink); cursor:default;}
+  .icon-row{display:flex; gap:4px;}
+  .icon-btn{
+    border:1px solid var(--line); background:var(--panel-2); color:var(--faint);
+    border-radius:4px; padding:4px 8px; font-size:11.5px; cursor:pointer;
+  }
+  .icon-btn:hover{color:var(--paper); border-color:var(--beacon);}
+
+  .history-box{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+    font-family:var(--font-mono); font-size:11px; color:var(--faint); display:none;
+  }
   .history-box.open{display:block;}
-  .session-box{font-size:11px; color:var(--dim); padding:8px; border:1px dashed var(--line); border-radius:4px; margin-bottom:10px;}
-  .session-box b{color:var(--accent);}
-  #log{
-    background:#070a06; border:1px solid var(--line); border-radius:6px; padding:10px;
-    height:280px; overflow-y:auto; font-size:11px; white-space:pre-wrap; word-break:break-word;
+  .history-line{margin-bottom:3px;}
+
+  .empty-state, .error-banner{
+    text-align:center; padding:36px 20px; color:var(--faint); font-size:13px;
+    border:1px dashed var(--line); border-radius:var(--radius);
   }
-  #log .ok{color:var(--accent);} #log .err{color:var(--bad);} #log .ts{color:var(--dim);}
-  .empty{color:var(--dim); font-style:italic;}
-  .small-note{color:var(--dim); font-size:11px; margin-top:4px;}
+  .error-banner{color:var(--flag); border-color:#4a2c26;}
+  .error-banner button{margin-top:10px;}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; top:18px; right:18px; z-index:50; display:flex; flex-direction:column; gap:8px;
+  }
+  .toast-msg{
+    background:var(--panel-2); border:1px solid var(--line); border-left:3px solid var(--beacon);
+    color:var(--paper); padding:10px 14px; border-radius:6px; font-size:12.5px; max-width:300px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35); animation:toast-in .2s ease-out;
+  }
+  .toast-msg.error{border-left-color:var(--flag);}
+  @keyframes toast-in{from{opacity:0; transform:translateY(-6px);} to{opacity:1; transform:translateY(0);}}
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>&gt; taskflow_console</h1>
-    <div class="tag">ferramenta de teste manual da API — não é a interface final do sistema</div>
+<div class="toast" id="toast" aria-live="polite"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="wordmark">TaskFlow</span>
+    <span class="dot" id="connDot"></span>
+    <span class="conn-label" id="connLabel">verificando</span>
   </div>
-  <div style="text-align:right">
-    <label style="margin:0">API base URL</label>
-    <input id="apiBase" style="width:280px" value="http://localhost:3000/api">
+  <div class="session" id="sessionArea" hidden>
+    <span class="who">olá, <b id="userName"></b></span>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">Sair</button>
   </div>
 </header>
 
-<div class="panel">
-  <h2>dashboard <button class="ghost small" style="margin-left:6px" onclick="carregarDashboard()">atualizar ↻</button></h2>
-  <div id="dashboardOut" class="empty">clique em "atualizar" após logar</div>
-</div>
-
-<div class="grid">
-
-  <div>
-    <div class="panel">
-      <h2>conexão</h2>
-      <button class="ghost" onclick="checarSaude()">testar /api/health</button>
-      <div id="healthOut" class="small-note"></div>
+<!-- ============ TELA DE LOGIN / CADASTRO ============ -->
+<main class="view auth-shell" id="authView">
+  <div class="auth-card">
+    <div class="tabs">
+      <div class="tab active" id="tabLogin" data-tab="login">Entrar</div>
+      <div class="tab" id="tabRegister" data-tab="register">Criar conta</div>
     </div>
 
-    <div class="panel">
-      <h2>sessão</h2>
-      <div class="session-box" id="sessionBox">nenhum usuário logado</div>
+    <div id="authAlert"></div>
 
-      <label>nome</label><input id="regName" placeholder="Maria Silva">
-      <label>e-mail</label><input id="regEmail" placeholder="maria@exemplo.com">
-      <div class="row">
-        <div><label>senha</label><input id="regPass" type="password"></div>
-        <div><label>confirmar senha</label><input id="regConfirm" type="password"></div>
+    <form id="loginForm">
+      <h2>Acessar conta</h2>
+      <p class="auth-sub">Use o e-mail e senha cadastrados.</p>
+      <div class="field">
+        <label for="loginEmail">E-mail</label>
+        <input id="loginEmail" type="email" autocomplete="username" required>
       </div>
-      <button onclick="registrar()">criar conta</button>
-
-      <div style="height:12px"></div>
-
-      <label>e-mail (login)</label><input id="loginEmail" placeholder="maria@exemplo.com">
-      <label>senha (login)</label><input id="loginPass" type="password">
-      <div class="row">
-        <button onclick="login()">entrar</button>
-        <button class="ghost" onclick="sair()">sair</button>
+      <div class="field">
+        <label for="loginPassword">Senha</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
       </div>
+      <button class="btn btn-primary" style="width:100%" type="submit">Entrar</button>
+    </form>
+
+    <form id="registerForm" hidden>
+      <h2>Criar conta</h2>
+      <p class="auth-sub">Leva menos de um minuto.</p>
+      <div class="field">
+        <label for="regName">Nome</label>
+        <input id="regName" type="text" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="regEmail">E-mail</label>
+        <input id="regEmail" type="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="regPassword">Senha</label>
+        <input id="regPassword" type="password" autocomplete="new-password" required minlength="6">
+      </div>
+      <div class="field">
+        <label for="regConfirm">Confirmar senha</label>
+        <input id="regConfirm" type="password" autocomplete="new-password" required minlength="6">
+      </div>
+      <button class="btn btn-primary" style="width:100%" type="submit">Criar conta</button>
+    </form>
+  </div>
+</main>
+
+<!-- ============ APP PRINCIPAL ============ -->
+<main class="view" id="appView" hidden>
+
+  <div class="app-header">
+    <div>
+      <div class="eyebrow">painel</div>
+      <h1>Suas tarefas</h1>
     </div>
+    <button class="btn btn-primary" id="newTaskBtn">+ Nova tarefa</button>
   </div>
 
-  <div>
-    <div class="panel">
-      <h2>nova tarefa</h2>
-      <label>título *</label><input id="tTitle" placeholder="Preparar apresentação">
-      <label>descrição</label><textarea id="tDesc"></textarea>
-      <div class="row">
-        <div><label>prioridade</label>
-          <select id="tPriority"><option value="baixa">baixa</option><option value="media" selected>media</option><option value="alta">alta</option></select>
-        </div>
-        <div><label>responsável</label><input id="tResp" placeholder="opcional"></div>
-        <div><label>data limite</label><input id="tDue" type="date"></div>
-      </div>
-      <button onclick="criarTarefa()">criar tarefa</button>
-    </div>
+  <section class="manifest" id="manifest">
+    <div class="manifest-cell"><div class="manifest-num" id="mPendentes">—</div><div class="manifest-label">Pendentes</div></div>
+    <div class="manifest-cell"><div class="manifest-num" id="mAndamento">—</div><div class="manifest-label">Em andamento</div></div>
+    <div class="manifest-cell"><div class="manifest-num" id="mConcluidas">—</div><div class="manifest-label">Concluídas</div></div>
+    <div class="manifest-cell" id="mAtrasadasCell"><div class="manifest-num" id="mAtrasadas">—</div><div class="manifest-label">Atrasadas</div></div>
+  </section>
 
-    <div class="panel">
-      <h2>filtros e busca</h2>
-      <div class="row">
-        <div><label>status</label>
-          <select id="fStatus"><option value="">todos</option><option value="pendente">pendente</option><option value="em_andamento">em_andamento</option><option value="concluida">concluida</option></select>
-        </div>
-        <div><label>prioridade</label>
-          <select id="fPriority"><option value="">todas</option><option value="baixa">baixa</option><option value="media">media</option><option value="alta">alta</option></select>
-        </div>
-      </div>
-      <div class="row">
-        <div><label>responsável contém</label><input id="fResp" placeholder="ex: Maria"></div>
-        <div><label>buscar no título/descrição</label><input id="fSearch" placeholder="ex: relatório" oninput="buscaAoDigitar()"></div>
-      </div>
-      <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
-        <input type="checkbox" id="fOverdue" style="width:auto"> mostrar só atrasadas
-      </label>
-      <button onclick="listarTarefas()">aplicar filtros</button>
-      <button class="ghost" onclick="limparFiltros()">limpar</button>
+  <div class="toolbar">
+    <div class="search-box">
+      <input id="searchInput" type="text" placeholder="Buscar por título ou descrição…">
     </div>
-
-    <div class="panel">
-      <h2>tarefas <button class="ghost small" style="margin-left:6px" onclick="listarTarefas()">atualizar lista ↻</button></h2>
-      <div id="taskList"><div class="empty">clique em "atualizar lista" após logar</div></div>
-    </div>
+    <button class="btn" id="toggleFiltersBtn">Filtros</button>
   </div>
-</div>
 
-<div class="panel">
-  <h2>log de requisições (debug)</h2>
-  <div id="log"><div class="empty">as respostas da API vão aparecer aqui</div></div>
-</div>
+  <section class="filters-panel" id="filtersPanel" hidden>
+    <div class="field">
+      <label for="fStatus">Status</label>
+      <select id="fStatus">
+        <option value="">Todos</option>
+        <option value="pendente">Pendente</option>
+        <option value="em_andamento">Em andamento</option>
+        <option value="concluida">Concluída</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fPriority">Prioridade</label>
+      <select id="fPriority">
+        <option value="">Todas</option>
+        <option value="baixa">Baixa</option>
+        <option value="media">Média</option>
+        <option value="alta">Alta</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fResponsible">Responsável</label>
+      <input id="fResponsible" type="text" placeholder="contém…">
+    </div>
+    <div class="field">
+      <label for="fDueDate">Data limite</label>
+      <input id="fDueDate" type="date">
+    </div>
+    <div class="filters-footer">
+      <label class="checkbox-line"><input type="checkbox" id="fOverdue"> mostrar só atrasadas</label>
+      <button class="btn btn-ghost btn-sm" id="clearFiltersBtn">Limpar filtros</button>
+    </div>
+  </section>
+
+  <section class="form-panel" id="taskFormPanel" hidden>
+    <h3 id="taskFormTitle">Nova tarefa</h3>
+    <div id="taskFormAlert"></div>
+    <div class="field">
+      <label for="tTitle">Título *</label>
+      <input id="tTitle" type="text" maxlength="200">
+    </div>
+    <div class="field">
+      <label for="tDesc">Descrição</label>
+      <textarea id="tDesc" maxlength="1000"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="tPriority">Prioridade</label>
+        <select id="tPriority">
+          <option value="baixa">Baixa</option>
+          <option value="media" selected>Média</option>
+          <option value="alta">Alta</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tResponsible">Responsável</label>
+        <input id="tResponsible" type="text" maxlength="100" placeholder="opcional">
+      </div>
+      <div class="field">
+        <label for="tDueDate">Data limite</label>
+        <input id="tDueDate" type="date">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="taskFormSubmit">Criar tarefa</button>
+      <button class="btn btn-ghost" id="taskFormCancel">Cancelar</button>
+    </div>
+  </section>
+
+  <section id="taskListWrap">
+    <div class="task-list" id="taskList"></div>
+  </section>
+
+</main>
 
 <script>
-// Tenta carregar o token persistido do localStorage ao iniciar o script
-let token = localStorage.getItem('taskflow_token') || null;
-let usuarioAtual = null;
+/* ============================================================
+   ESTADO E CONFIGURAÇÃO
+   API_BASE é relativo porque este arquivo é servido pelo mesmo
+   backend Express (mesma origem) — sem CORS, sem URL configurável.
+   ============================================================ */
+const API_BASE = '/api';
+let token = null;          // guardado só em memória (sem localStorage)
+let currentUser = null;
+let editingTaskId = null;  // null = criando; com valor = editando
 
-function apiBase(){ return document.getElementById('apiBase').value.replace(/\/$/, ''); }
+const el = (id) => document.getElementById(id);
 
-function log(label, ok, data){
-  const el = document.getElementById('log');
-  if (el.querySelector('.empty')) el.innerHTML = '';
-  const hora = new Date().toLocaleTimeString();
-  const linha = document.createElement('div');
-  linha.innerHTML = `<span class="ts">[${hora}]</span> <span class="${ok ? 'ok' : 'err'}">${label}</span>\n${JSON.stringify(data, null, 2)}\n`;
-  el.prepend(linha);
+/* ---------------- toast ---------------- */
+function toast(msg, isError){
+  const wrap = el('toast');
+  const item = document.createElement('div');
+  item.className = 'toast-msg' + (isError ? ' error' : '');
+  item.textContent = msg;
+  wrap.appendChild(item);
+  setTimeout(() => item.remove(), 4200);
 }
 
-async function request(method, path, body){
+/* ---------------- chamada à API ---------------- */
+async function api(method, path, body){
   try{
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch(apiBase() + path, {
-      method, headers, body: body ? JSON.stringify(body) : undefined
+    const res = await fetch(API_BASE + path, {
+      method, headers, body: body !== undefined ? JSON.stringify(body) : undefined
     });
     const data = await res.json().catch(() => ({}));
-    log(`${method} ${path} → ${res.status}`, res.ok, data);
     return { ok: res.ok, status: res.status, data };
   }catch(err){
-    log(`${method} ${path} → falhou`, false, { error: err.message, dica: 'verifique se o backend está rodando e se a URL base está correta' });
-    return { ok: false, status: 0, data: { error: err.message } };
+    return { ok: false, status: 0, data: { error: 'Não foi possível conectar ao servidor.' } };
   }
 }
 
-function atualizarSessionBox(){
-  const box = document.getElementById('sessionBox');
-  box.innerHTML = usuarioAtual
-    ? `logado como <b>${usuarioAtual.name}</b> (${usuarioAtual.email})`
-    : 'nenhum usuário logado';
+function primeiraMensagemDeErro(data){
+  if (data.errors && data.errors.length) return data.errors[0].msg;
+  if (data.error) return data.error;
+  return 'Algo deu errado. Tente novamente.';
 }
 
-// --- FUNÇÃO ADICIONADA: CHECAGEM AUTOMÁTICA DE SESSÃO (MÁGICA DO F5) ---
-async function inicializarSessao(){
-  if (!token) {
-    atualizarSessionBox();
+/* ---------------- status de conexão ---------------- */
+async function verificarConexao(){
+  const r = await api('GET', '/health');
+  el('connDot').className = 'dot ' + (r.ok ? 'online' : 'offline');
+  el('connLabel').textContent = r.ok ? 'online' : 'offline';
+}
+
+/* ---------------- alternância de telas ---------------- */
+function mostrarApp(){
+  el('authView').hidden = true;
+  el('appView').hidden = false;
+  el('sessionArea').hidden = false;
+  el('userName').textContent = currentUser ? currentUser.name : '';
+  carregarDashboard();
+  carregarTarefas();
+}
+function mostrarAuth(){
+  el('appView').hidden = true;
+  el('authView').hidden = false;
+  el('sessionArea').hidden = true;
+}
+
+/* ---------------- abas login/cadastro ---------------- */
+el('tabLogin').addEventListener('click', () => alternarAba('login'));
+el('tabRegister').addEventListener('click', () => alternarAba('register'));
+function alternarAba(qual){
+  el('tabLogin').classList.toggle('active', qual === 'login');
+  el('tabRegister').classList.toggle('active', qual === 'register');
+  el('loginForm').hidden = qual !== 'login';
+  el('registerForm').hidden = qual !== 'register';
+  el('authAlert').innerHTML = '';
+}
+
+function mostrarAlertaAuth(msg){
+  el('authAlert').innerHTML = `<div class="alert alert-error">${msg}</div>`;
+}
+
+/* ---------------- login ---------------- */
+el('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  el('authAlert').innerHTML = '';
+  const r = await api('POST', '/auth/login', {
+    email: el('loginEmail').value.trim(),
+    password: el('loginPassword').value,
+  });
+  if (!r.ok){ mostrarAlertaAuth(primeiraMensagemDeErro(r.data)); return; }
+  token = r.data.token;
+  currentUser = r.data.user;
+  toast('Login realizado com sucesso.');
+  mostrarApp();
+});
+
+/* ---------------- cadastro ---------------- */
+el('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  el('authAlert').innerHTML = '';
+  const password = el('regPassword').value;
+  const confirmPassword = el('regConfirm').value;
+  if (password !== confirmPassword){
+    mostrarAlertaAuth('As senhas não coincidem.');
     return;
   }
-  
-  // Como a rota /auth/me está fora do prefixo /tasks, passamos o caminho direto.
-  // Caso seu backend use o prefixo do console (/api/auth/me), o request('GET', '/auth/me') resolverá.
-  const r = await request('GET', '/auth/me');
-  
-  if (r.ok && r.data.user) {
-    usuarioAtual = r.data.user;
-    atualizarSessionBox();
-    listarTarefas();
-    carregarDashboard();
-  } else {
-    // Se o token for inválido/expirado, limpa tudo de forma limpa
-    localStorage.removeItem('taskflow_token');
-    token = null;
-    usuarioAtual = null;
-    atualizarSessionBox();
-  }
+  const r = await api('POST', '/auth/register', {
+    name: el('regName').value.trim(),
+    email: el('regEmail').value.trim(),
+    password, confirmPassword,
+  });
+  if (!r.ok){ mostrarAlertaAuth(primeiraMensagemDeErro(r.data)); return; }
+  token = r.data.token;
+  currentUser = r.data.user;
+  toast('Conta criada com sucesso.');
+  mostrarApp();
+});
+
+/* ---------------- logout ---------------- */
+el('logoutBtn').addEventListener('click', () => {
+  token = null; currentUser = null;
+  el('loginForm').reset(); el('registerForm').reset();
+  mostrarAuth();
+});
+
+/* ---------------- dashboard ---------------- */
+async function carregarDashboard(){
+  const r = await api('GET', '/dashboard');
+  if (!r.ok) return;
+  const d = r.data;
+  el('mPendentes').textContent = d.pendentes;
+  el('mAndamento').textContent = d.em_andamento;
+  el('mConcluidas').textContent = d.concluidas;
+  el('mAtrasadas').textContent = d.atrasadas;
+  el('mAtrasadasCell').classList.toggle('flagged', d.atrasadas > 0);
 }
 
-async function checarSaude(){
-  const r = await request('GET', '/health');
-  document.getElementById('healthOut').textContent = r.ok ? 'API respondendo ✓' : 'API não respondeu — confira se o servidor está rodando';
-}
+/* ---------------- filtros e busca ---------------- */
+el('toggleFiltersBtn').addEventListener('click', () => {
+  el('filtersPanel').hidden = !el('filtersPanel').hidden;
+});
+el('clearFiltersBtn').addEventListener('click', () => {
+  el('fStatus').value = ''; el('fPriority').value = '';
+  el('fResponsible').value = ''; el('fDueDate').value = ''; el('fOverdue').checked = false;
+  el('searchInput').value = '';
+  carregarTarefas();
+});
+['fStatus','fPriority','fResponsible','fDueDate','fOverdue'].forEach(id => {
+  el(id).addEventListener('change', carregarTarefas);
+});
+let debounceBusca;
+el('searchInput').addEventListener('input', () => {
+  clearTimeout(debounceBusca);
+  debounceBusca = setTimeout(carregarTarefas, 350);
+});
 
-async function registrar(){
-  const body = {
-    name: document.getElementById('regName').value,
-    email: document.getElementById('regEmail').value,
-    password: document.getElementById('regPass').value,
-    confirmPassword: document.getElementById('regConfirm').value,
-  };
-  const r = await request('POST', '/auth/register', body);
-  if (r.ok){ 
-    token = r.data.token; 
-    usuarioAtual = r.data.user; 
-    // Salva no localStorage para persistir
-    localStorage.setItem('taskflow_token', token);
-    atualizarSessionBox(); 
-    listarTarefas(); 
-    carregarDashboard(); 
-  }
-}
-
-async function login(){
-  const body = { email: document.getElementById('loginEmail').value, password: document.getElementById('loginPass').value };
-  const r = await request('POST', '/auth/login', body);
-  if (r.ok){ 
-    token = r.data.token; 
-    usuarioAtual = r.data.user; 
-    // Salva no localStorage para persistir
-    localStorage.setItem('taskflow_token', token);
-    atualizarSessionBox(); 
-    listarTarefas(); 
-    carregarDashboard(); 
-  }
-}
-
-function sair(){
-  // Remove o token salvo no localStorage
-  localStorage.removeItem('taskflow_token');
-  token = null; usuarioAtual = null; atualizarSessionBox();
-  document.getElementById('taskList').innerHTML = '<div class="empty">faça login para ver as tarefas</div>';
-  document.getElementById('dashboardOut').innerHTML = '<div class="empty">clique em "atualizar" após logar</div>';
-}
-
-async function criarTarefa(){
-  if (!token){ alert('Faça login antes de criar uma tarefa.'); return; }
-  const body = {
-    title: document.getElementById('tTitle').value,
-    description: document.getElementById('tDesc').value || undefined,
-    priority: document.getElementById('tPriority').value,
-    responsible: document.getElementById('tResp').value || undefined,
-    due_date: document.getElementById('tDue').value || undefined,
-  };
-  const r = await request('POST', '/tasks', body);
-  if (r.ok){ document.getElementById('tTitle').value = ''; document.getElementById('tDesc').value = ''; listarTarefas(); carregarDashboard(); }
-}
-
-function montarQueryFiltros(){
-  const params = new URLSearchParams();
-  const status = document.getElementById('fStatus').value;
-  const priority = document.getElementById('fPriority').value;
-  const responsible = document.getElementById('fResp').value;
-  const search = document.getElementById('fSearch').value;
-  const overdue = document.getElementById('fOverdue').checked;
-  if (status) params.set('status', status);
-  if (priority) params.set('priority', priority);
-  if (responsible) params.set('responsible', responsible);
-  if (search) params.set('search', search);
-  if (overdue) params.set('overdue', 'true');
-  const qs = params.toString();
+function montarQuery(){
+  const p = new URLSearchParams();
+  if (el('fStatus').value) p.set('status', el('fStatus').value);
+  if (el('fPriority').value) p.set('priority', el('fPriority').value);
+  if (el('fResponsible').value) p.set('responsible', el('fResponsible').value);
+  if (el('fDueDate').value) p.set('due_date', el('fDueDate').value);
+  if (el('fOverdue').checked) p.set('overdue', 'true');
+  if (el('searchInput').value) p.set('search', el('searchInput').value);
+  const qs = p.toString();
   return qs ? '?' + qs : '';
 }
 
-function limparFiltros(){
-  document.getElementById('fStatus').value = '';
-  document.getElementById('fPriority').value = '';
-  document.getElementById('fResp').value = '';
-  document.getElementById('fSearch').value = '';
-  document.getElementById('fOverdue').checked = false;
-  listarTarefas();
+/* ---------------- formulário de tarefa (criar/editar) ---------------- */
+el('newTaskBtn').addEventListener('click', () => abrirFormulario(null));
+el('taskFormCancel').addEventListener('click', fecharFormulario);
+
+function abrirFormulario(task){
+  editingTaskId = task ? task.id : null;
+  el('taskFormTitle').textContent = task ? 'Editar tarefa' : 'Nova tarefa';
+  el('taskFormSubmit').textContent = task ? 'Salvar alterações' : 'Criar tarefa';
+  el('taskFormAlert').innerHTML = '';
+  el('tTitle').value = task ? task.title : '';
+  el('tDesc').value = task ? (task.description || '') : '';
+  el('tPriority').value = task ? task.priority : 'media';
+  el('tResponsible').value = task ? (task.responsible || '') : '';
+  el('tDueDate').value = task && task.due_date ? task.due_date.slice(0, 10) : '';
+  el('taskFormPanel').hidden = false;
+  el('taskFormPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el('tTitle').focus();
+}
+function fecharFormulario(){
+  editingTaskId = null;
+  el('taskFormPanel').hidden = true;
 }
 
-let debounceBusca;
-function buscaAoDigitar(){
-  clearTimeout(debounceBusca);
-  debounceBusca = setTimeout(listarTarefas, 400);
-}
+el('taskFormSubmit').addEventListener('click', async () => {
+  const payload = {
+    title: el('tTitle').value.trim(),
+    description: el('tDesc').value.trim() || undefined,
+    priority: el('tPriority').value,
+    responsible: el('tResponsible').value.trim() || undefined,
+    due_date: el('tDueDate').value || undefined,
+  };
+  const r = editingTaskId
+    ? await api('PUT', `/tasks/${editingTaskId}`, payload)
+    : await api('POST', '/tasks', payload);
 
-async function carregarDashboard(){
-  if (!token){ document.getElementById('dashboardOut').textContent = 'faça login primeiro'; return; }
-  const r = await request('GET', '/dashboard');
-  const el = document.getElementById('dashboardOut');
-  if (!r.ok){ el.textContent = 'não foi possível carregar os indicadores'; return; }
-  const d = r.data;
-  el.innerHTML = `
-    <span class="status-pill pendente">pendentes: ${d.pendentes}</span>
-    <span class="status-pill em_andamento">em andamento: ${d.em_andamento}</span>
-    <span class="status-pill concluida">concluídas: ${d.concluidas}</span>
-    <span class="status-pill" style="border-color:var(--bad); color:var(--bad)">atrasadas: ${d.atrasadas}</span>
-    <span style="color:var(--dim)"> · total: ${d.total}</span>
-  `;
-}
+  if (!r.ok){
+    el('taskFormAlert').innerHTML = `<div class="alert alert-error">${primeiraMensagemDeErro(r.data)}</div>`;
+    return;
+  }
+  toast(editingTaskId ? 'Tarefa atualizada.' : 'Tarefa criada.');
+  fecharFormulario();
+  carregarTarefas();
+  carregarDashboard();
+});
 
-async function listarTarefas(){
-  if (!token){ document.getElementById('taskList').innerHTML = '<div class="empty">faça login primeiro</div>'; return; }
-  const r = await request('GET', '/tasks' + montarQueryFiltros());
-  const cont = document.getElementById('taskList');
-  if (!r.ok){ cont.innerHTML = '<div class="empty">não foi possível carregar as tarefas</div>'; return; }
+/* ---------------- listar e renderizar tarefas ---------------- */
+async function carregarTarefas(){
+  const wrap = el('taskList');
+  const r = await api('GET', '/tasks' + montarQuery());
+
+  if (!r.ok){
+    wrap.innerHTML = `<div class="error-banner">Não foi possível carregar as tarefas.<br><button class="btn btn-sm" onclick="carregarTarefas()">Tentar novamente</button></div>`;
+    return;
+  }
+
   const tarefas = r.data.tasks || [];
-  if (tarefas.length === 0){ cont.innerHTML = '<div class="empty">nenhuma tarefa ainda</div>'; return; }
+  if (tarefas.length === 0){
+    const filtrosAtivos = montarQuery() !== '';
+    wrap.innerHTML = `<div class="empty-state">${
+      filtrosAtivos
+        ? 'Nenhuma tarefa encontrada com esses filtros. Ajuste ou limpe os filtros.'
+        : 'Você ainda não tem tarefas. Crie a primeira para começar.'
+    }</div>`;
+    return;
+  }
 
-  cont.innerHTML = '';
-  tarefas.forEach(t => {
-    const div = document.createElement('div');
-    div.className = 'task';
-    div.innerHTML = `
-      <div class="top">
-        <div>
-          <div class="title">${t.title}</div>
-          <div class="meta">${t.description || ''}</div>
-          <div class="meta">
-            <span class="status-pill ${t.status}">${t.status}</span>
-            <span class="${t.priority}">● ${t.priority}</span>
-            ${t.responsible ? ' · resp: ' + t.responsible : ''}
-            ${t.due_date ? ' · prazo: ' + t.due_date.slice(0,10) : ''}
-          </div>
-        </div>
-      </div>
-      <div>
-        <select id="status-${t.id}">
-          <option value="pendente" ${t.status==='pendente'?'selected':''}>pendente</option>
-          <option value="em_andamento" ${t.status==='em_andamento'?'selected':''}>em_andamento</option>
-          <option value="concluida" ${t.status==='concluida'?'selected':''}>concluida</option>
-        </select>
-        <button class="small ghost" onclick="mudarStatus(${t.id})">aplicar status</button>
-        <button class="small ghost" onclick="verHistorico(${t.id})">histórico</button>
-        <button class="small danger" onclick="excluirTarefa(${t.id})">excluir</button>
+  wrap.innerHTML = '';
+  tarefas.forEach(t => wrap.appendChild(renderTaskStub(t)));
+}
+
+const LABEL_STATUS = { pendente: 'Pendente', em_andamento: 'Em andamento', concluida: 'Concluída' };
+const LABEL_PRIORIDADE = { baixa: 'baixa', media: 'média', alta: 'alta' };
+
+function formatarData(iso){
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+function estaAtrasada(t){
+  if (!t.due_date || t.status === 'concluida') return false;
+  return t.due_date.slice(0, 10) < new Date().toISOString().slice(0, 10);
+}
+
+function renderTaskStub(t){
+  const div = document.createElement('div');
+  div.className = 'task-stub';
+
+  const atrasada = estaAtrasada(t);
+
+  div.innerHTML = `
+    <div class="stamp ${t.status}" data-stamp="${t.id}">${LABEL_STATUS[t.status]}</div>
+    <div class="task-body">
+      <div class="task-title ${t.status === 'concluida' ? 'done' : ''}">${escapeHtml(t.title)}</div>
+      ${t.description ? `<div class="task-desc">${escapeHtml(t.description)}</div>` : ''}
+      <div class="task-meta">
+        <span class="flag-icon priority-${t.priority}">● ${LABEL_PRIORIDADE[t.priority]}</span>
+        ${t.responsible ? `<span>resp: ${escapeHtml(t.responsible)}</span>` : ''}
+        ${t.due_date ? `<span class="${atrasada ? 'meta-overdue' : ''}">${atrasada ? 'atrasada desde ' : 'prazo '}${formatarData(t.due_date)}</span>` : ''}
       </div>
       <div class="history-box" id="hist-${t.id}"></div>
-    `;
-    cont.appendChild(div);
+    </div>
+    <div class="task-controls">
+      <div class="status-pills">
+        ${['pendente','em_andamento','concluida'].map(s => `
+          <button class="pill ${s === t.status ? 'current' : ''}" data-action="status" data-id="${t.id}" data-status="${s}" ${s === t.status ? 'disabled' : ''}>${LABEL_STATUS[s]}</button>
+        `).join('')}
+      </div>
+      <div class="icon-row">
+        <button class="icon-btn" data-action="edit" data-id="${t.id}">Editar</button>
+        <button class="icon-btn" data-action="history" data-id="${t.id}">Histórico</button>
+        <button class="icon-btn" data-action="delete" data-id="${t.id}">Excluir</button>
+      </div>
+    </div>
+  `;
+
+  div.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => handleTaskAction(btn.dataset.action, t, btn));
   });
+
+  return div;
 }
 
-async function mudarStatus(id){
-  const status = document.getElementById('status-' + id).value;
-  const r = await request('PATCH', `/tasks/${id}/status`, { status });
-  if (r.ok){ listarTarefas(); carregarDashboard(); }
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
-async function excluirTarefa(id){
-  if (!confirm('Excluir esta tarefa? Essa ação não pode ser desfeita.')) return;
-  const r = await request('DELETE', `/tasks/${id}`);
-  if (r.ok){ listarTarefas(); carregarDashboard(); }
+async function handleTaskAction(action, task, btn){
+  if (action === 'edit'){
+    abrirFormulario(task);
+    return;
+  }
+
+  if (action === 'delete'){
+    if (!confirm(`Excluir a tarefa "${task.title}"? Essa ação não pode ser desfeita.`)) return;
+    const r = await api('DELETE', `/tasks/${task.id}`);
+    if (!r.ok){ toast(primeiraMensagemDeErro(r.data), true); return; }
+    toast('Tarefa excluída.');
+    carregarTarefas(); carregarDashboard();
+    return;
+  }
+
+  if (action === 'status'){
+    const novoStatus = btn.dataset.status;
+    const r = await api('PATCH', `/tasks/${task.id}/status`, { status: novoStatus });
+    if (!r.ok){ toast(primeiraMensagemDeErro(r.data), true); return; }
+    await carregarTarefas();
+    carregarDashboard();
+    const stampEl = document.querySelector(`[data-stamp="${task.id}"]`);
+    if (stampEl){ stampEl.classList.add('pulse'); setTimeout(() => stampEl.classList.remove('pulse'), 400); }
+    return;
+  }
+
+  if (action === 'history'){
+    const box = el('hist-' + task.id);
+    if (box.classList.contains('open')){ box.classList.remove('open'); return; }
+    const r = await api('GET', `/tasks/${task.id}/history`);
+    if (!r.ok){ toast('Não foi possível carregar o histórico.', true); return; }
+    const itens = r.data.history || [];
+    box.innerHTML = itens.length
+      ? itens.map(h => `<div class="history-line">${new Date(h.changed_at).toLocaleString('pt-BR')} — ${h.field}: "${h.old_value ?? '—'}" → "${h.new_value}"</div>`).join('')
+      : '<div class="history-line">Sem alterações registradas ainda.</div>';
+    box.classList.add('open');
+  }
 }
 
-async function verHistorico(id){
-  const box = document.getElementById('hist-' + id);
-  const aberto = box.classList.contains('open');
-  if (aberto){ box.classList.remove('open'); return; }
-  const r = await request('GET', `/tasks/${id}/history`);
-  if (!r.ok) return;
-  const itens = r.data.history || [];
-  box.innerHTML = itens.length
-    ? itens.map(h => `${new Date(h.changed_at).toLocaleString()} — ${h.field}: "${h.old_value ?? '—'}" → "${h.new_value}"`).join('<br>')
-    : 'sem alterações registradas ainda';
-  box.classList.add('open');
-}
-
-// INICIALIZAÇÃO DA SESSÃO AUTOMÁTICA AO CARREGAR O ARQUIVO
-inicializarSessao();
+/* ---------------- inicialização ---------------- */
+verificarConexao();
+setInterval(verificarConexao, 60000);
 </script>
 </body>
 </html>
