@@ -86,4 +86,11 @@ app.listen(PORT, () => {
   console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
 
+const PORT = process.env.PORT || 3000;
+// Exportar o app é uma excelente prática para ambientes serverless
+app.listen(PORT, () => {
+console.log(`Servidor ativo na porta ${PORT}`);
+});
 module.exports = app;
+
+
