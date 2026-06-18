@@ -86,11 +86,16 @@ app.listen(PORT, () => {
   console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
 
-const PORT = process.env.PORT || 3000;
-// Exportar o app é uma excelente prática para ambientes serverless
-app.listen(PORT, () => {
-console.log(`Servidor ativo na porta ${PORT}`);
-});
+
+
+// Só roda o listen se NÃO estiver na Vercel (ambiente local)
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Servidor rodando localmente na porta ${PORT}`);
+    });
+}
+
+// ISSO AQUI É OBRIGATÓRIO PARA A VERCEL:
 module.exports = app;
 
 
