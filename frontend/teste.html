@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>TaskFlow — Console de Testes da API</title>
+<style>
+  :root{
+    --bg:#0b0f0d; --panel:#10160f; --line:#1d2a1c; --ink:#d7e8d4; --dim:#5d7a5a;
+    --accent:#7ee08c; --accent-dim:#3a5c40; --warn:#e0c97e; --bad:#e08a7e; --blue:#7eb3e0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg); color:var(--ink); margin:0; padding:32px;
+    font-family:'JetBrains Mono','Fira Code',Consolas,monospace; font-size:13px; line-height:1.5;
+  }
+  h1{font-size:16px; letter-spacing:.5px; color:var(--accent); margin:0;}
+  .tag{color:var(--dim); font-size:12px;}
+  header{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:18px; flex-wrap:wrap; gap:8px;}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px; margin-bottom:18px;}
+  .panel h2{font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); margin:0 0 12px 0; border-bottom:1px solid var(--line); padding-bottom:8px;}
+  label{display:block; font-size:11px; color:var(--dim); margin:8px 0 3px;}
+  input,select,textarea{
+    width:100%; background:#070a06; border:1px solid var(--line); color:var(--ink);
+    padding:7px 8px; border-radius:4px; font-family:inherit; font-size:13px;
+  }
+  textarea{resize:vertical; min-height:50px;}
+  input:focus,select:focus,textarea:focus{outline:1px solid var(--accent);}
+  .row{display:flex; gap:8px;}
+  .row > *{flex:1;}
+  button{
+    background:var(--accent-dim); color:var(--accent); border:1px solid var(--accent-dim);
+    padding:8px 14px; border-radius:4px; font-family:inherit; font-size:12px; cursor:pointer;
+    margin-top:10px;
+  }
+  button:hover{background:var(--accent); color:#06140a;}
+  button.ghost{background:transparent; border:1px solid var(--line); color:var(--dim);}
+  button.danger{background:#3a2020; border:1px solid #5c3a3a; color:var(--bad);}
+  button.danger:hover{background:var(--bad); color:#1a0a0a;}
+  button.small{padding:4px 8px; font-size:11px; margin:2px 2px 0 0;}
+  .status-pill{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; border:1px solid;}
+  .pendente{color:var(--warn); border-color:var(--warn);}
+  .em_andamento{color:var(--blue); border-color:var(--blue);}
+  .concluida{color:var(--accent); border-color:var(--accent);}
+  .baixa{color:var(--dim);} .media{color:var(--warn);} .alta{color:var(--bad);}
+  .task{border:1px solid var(--line); border-radius:5px; padding:10px; margin-bottom:8px; background:#0d130c;}
+  .task .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .task .title{font-weight:bold; color:var(--ink);}
+  .task .meta{color:var(--dim); font-size:11px; margin-top:3px;}
+  .history-box{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:11px; color:var(--dim); display:none;}
+  .history-box.open{display:block;}
+  .session-box{font-size:11px; color:var(--dim); padding:8px; border:1px dashed var(--line); border-radius:4px; margin-bottom:10px;}
+  .session-box b{color:var(--accent);}
+  #log{
+    background:#070a06; border:1px solid var(--line); border-radius:6px; padding:10px;
+    height:280px; overflow-y:auto; font-size:11px; white-space:pre-wrap; word-break:break-word;
+  }
+  #log .ok{color:var(--accent);} #log .err{color:var(--bad);} #log .ts{color:var(--dim);}
+  .empty{color:var(--dim); font-style:italic;}
+  .small-note{color:var(--dim); font-size:11px; margin-top:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>&gt; taskflow_console</h1>
+    <div class="tag">ferramenta de teste manual da API — não é a interface final do sistema</div>
+  </div>
+  <div style="text-align:right">
+    <label style="margin:0">API base URL</label>
+    <input id="apiBase" style="width:280px" value="http://localhost:3000/api">
+  </div>
+</header>
+
+<div class="panel">
+  <h2>dashboard <button class="ghost small" style="margin-left:6px" onclick="carregarDashboard()">atualizar ↻</button></h2>
+  <div id="dashboardOut" class="empty">clique em "atualizar" após logar</div>
+</div>
+
+<div class="grid">
+
+  <div>
+    <div class="panel">
+      <h2>conexão</h2>
+      <button class="ghost" onclick="checarSaude()">testar /api/health</button>
+      <div id="healthOut" class="small-note"></div>
+    </div>
+
+    <div class="panel">
+      <h2>sessão</h2>
+      <div class="session-box" id="sessionBox">nenhum usuário logado</div>
+
+      <label>nome</label><input id="regName" placeholder="Maria Silva">
+      <label>e-mail</label><input id="regEmail" placeholder="maria@exemplo.com">
+      <div class="row">
+        <div><label>senha</label><input id="regPass" type="password"></div>
+        <div><label>confirmar senha</label><input id="regConfirm" type="password"></div>
+      </div>
+      <button onclick="registrar()">criar conta</button>
+
+      <div style="height:12px"></div>
+
+      <label>e-mail (login)</label><input id="loginEmail" placeholder="maria@exemplo.com">
+      <label>senha (login)</label><input id="loginPass" type="password">
+      <div class="row">
+        <button onclick="login()">entrar</button>
+        <button class="ghost" onclick="sair()">sair</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>nova tarefa</h2>
+      <label>título *</label><input id="tTitle" placeholder="Preparar apresentação">
+      <label>descrição</label><textarea id="tDesc"></textarea>
+      <div class="row">
+        <div><label>prioridade</label>
+          <select id="tPriority"><option value="baixa">baixa</option><option value="media" selected>media</option><option value="alta">alta</option></select>
+        </div>
+        <div><label>responsável</label><input id="tResp" placeholder="opcional"></div>
+        <div><label>data limite</label><input id="tDue" type="date"></div>
+      </div>
+      <button onclick="criarTarefa()">criar tarefa</button>
+    </div>
+
+    <div class="panel">
+      <h2>filtros e busca</h2>
+      <div class="row">
+        <div><label>status</label>
+          <select id="fStatus"><option value="">todos</option><option value="pendente">pendente</option><option value="em_andamento">em_andamento</option><option value="concluida">concluida</option></select>
+        </div>
+        <div><label>prioridade</label>
+          <select id="fPriority"><option value="">todas</option><option value="baixa">baixa</option><option value="media">media</option><option value="alta">alta</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <div><label>responsável contém</label><input id="fResp" placeholder="ex: Maria"></div>
+        <div><label>buscar no título/descrição</label><input id="fSearch" placeholder="ex: relatório" oninput="buscaAoDigitar()"></div>
+      </div>
+      <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+        <input type="checkbox" id="fOverdue" style="width:auto"> mostrar só atrasadas
+      </label>
+      <button onclick="listarTarefas()">aplicar filtros</button>
+      <button class="ghost" onclick="limparFiltros()">limpar</button>
+    </div>
+
+    <div class="panel">
+      <h2>tarefas <button class="ghost small" style="margin-left:6px" onclick="listarTarefas()">atualizar lista ↻</button></h2>
+      <div id="taskList"><div class="empty">clique em "atualizar lista" após logar</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>log de requisições (debug)</h2>
+  <div id="log"><div class="empty">as respostas da API vão aparecer aqui</div></div>
+</div>
+
+<script>
+// Tenta carregar o token persistido do localStorage ao iniciar o script
+let token = localStorage.getItem('taskflow_token') || null;
+let usuarioAtual = null;
+
+function apiBase(){ return document.getElementById('apiBase').value.replace(/\/$/, ''); }
+
+function log(label, ok, data){
+  const el = document.getElementById('log');
+  if (el.querySelector('.empty')) el.innerHTML = '';
+  const hora = new Date().toLocaleTimeString();
+  const linha = document.createElement('div');
+  linha.innerHTML = `<span class="ts">[${hora}]</span> <span class="${ok ? 'ok' : 'err'}">${label}</span>\n${JSON.stringify(data, null, 2)}\n`;
+  el.prepend(linha);
+}
+
+async function request(method, path, body){
+  try{
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(apiBase() + path, {
+      method, headers, body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await res.json().catch(() => ({}));
+    log(`${method} ${path} → ${res.status}`, res.ok, data);
+    return { ok: res.ok, status: res.status, data };
+  }catch(err){
+    log(`${method} ${path} → falhou`, false, { error: err.message, dica: 'verifique se o backend está rodando e se a URL base está correta' });
+    return { ok: false, status: 0, data: { error: err.message } };
+  }
+}
+
+function atualizarSessionBox(){
+  const box = document.getElementById('sessionBox');
+  box.innerHTML = usuarioAtual
+    ? `logado como <b>${usuarioAtual.name}</b> (${usuarioAtual.email})`
+    : 'nenhum usuário logado';
+}
+
+// --- FUNÇÃO ADICIONADA: CHECAGEM AUTOMÁTICA DE SESSÃO (MÁGICA DO F5) ---
+async function inicializarSessao(){
+  if (!token) {
+    atualizarSessionBox();
+    return;
+  }
+  
+  // Como a rota /auth/me está fora do prefixo /tasks, passamos o caminho direto.
+  // Caso seu backend use o prefixo do console (/api/auth/me), o request('GET', '/auth/me') resolverá.
+  const r = await request('GET', '/auth/me');
+  
+  if (r.ok && r.data.user) {
+    usuarioAtual = r.data.user;
+    atualizarSessionBox();
+    listarTarefas();
+    carregarDashboard();
+  } else {
+    // Se o token for inválido/expirado, limpa tudo de forma limpa
+    localStorage.removeItem('taskflow_token');
+    token = null;
+    usuarioAtual = null;
+    atualizarSessionBox();
+  }
+}
+
+async function checarSaude(){
+  const r = await request('GET', '/health');
+  document.getElementById('healthOut').textContent = r.ok ? 'API respondendo ✓' : 'API não respondeu — confira se o servidor está rodando';
+}
+
+async function registrar(){
+  const body = {
+    name: document.getElementById('regName').value,
+    email: document.getElementById('regEmail').value,
+    password: document.getElementById('regPass').value,
+    confirmPassword: document.getElementById('regConfirm').value,
+  };
+  const r = await request('POST', '/auth/register', body);
+  if (r.ok){ 
+    token = r.data.token; 
+    usuarioAtual = r.data.user; 
+    // Salva no localStorage para persistir
+    localStorage.setItem('taskflow_token', token);
+    atualizarSessionBox(); 
+    listarTarefas(); 
+    carregarDashboard(); 
+  }
+}
+
+async function login(){
+  const body = { email: document.getElementById('loginEmail').value, password: document.getElementById('loginPass').value };
+  const r = await request('POST', '/auth/login', body);
+  if (r.ok){ 
+    token = r.data.token; 
+    usuarioAtual = r.data.user; 
+    // Salva no localStorage para persistir
+    localStorage.setItem('taskflow_token', token);
+    atualizarSessionBox(); 
+    listarTarefas(); 
+    carregarDashboard(); 
+  }
+}
+
+function sair(){
+  // Remove o token salvo no localStorage
+  localStorage.removeItem('taskflow_token');
+  token = null; usuarioAtual = null; atualizarSessionBox();
+  document.getElementById('taskList').innerHTML = '<div class="empty">faça login para ver as tarefas</div>';
+  document.getElementById('dashboardOut').innerHTML = '<div class="empty">clique em "atualizar" após logar</div>';
+}
+
+async function criarTarefa(){
+  if (!token){ alert('Faça login antes de criar uma tarefa.'); return; }
+  const body = {
+    title: document.getElementById('tTitle').value,
+    description: document.getElementById('tDesc').value || undefined,
+    priority: document.getElementById('tPriority').value,
+    responsible: document.getElementById('tResp').value || undefined,
+    due_date: document.getElementById('tDue').value || undefined,
+  };
+  const r = await request('POST', '/tasks', body);
+  if (r.ok){ document.getElementById('tTitle').value = ''; document.getElementById('tDesc').value = ''; listarTarefas(); carregarDashboard(); }
+}
+
+function montarQueryFiltros(){
+  const params = new URLSearchParams();
+  const status = document.getElementById('fStatus').value;
+  const priority = document.getElementById('fPriority').value;
+  const responsible = document.getElementById('fResp').value;
+  const search = document.getElementById('fSearch').value;
+  const overdue = document.getElementById('fOverdue').checked;
+  if (status) params.set('status', status);
+  if (priority) params.set('priority', priority);
+  if (responsible) params.set('responsible', responsible);
+  if (search) params.set('search', search);
+  if (overdue) params.set('overdue', 'true');
+  const qs = params.toString();
+  return qs ? '?' + qs : '';
+}
+
+function limparFiltros(){
+  document.getElementById('fStatus').value = '';
+  document.getElementById('fPriority').value = '';
+  document.getElementById('fResp').value = '';
+  document.getElementById('fSearch').value = '';
+  document.getElementById('fOverdue').checked = false;
+  listarTarefas();
+}
+
+let debounceBusca;
+function buscaAoDigitar(){
+  clearTimeout(debounceBusca);
+  debounceBusca = setTimeout(listarTarefas, 400);
+}
+
+async function carregarDashboard(){
+  if (!token){ document.getElementById('dashboardOut').textContent = 'faça login primeiro'; return; }
+  const r = await request('GET', '/dashboard');
+  const el = document.getElementById('dashboardOut');
+  if (!r.ok){ el.textContent = 'não foi possível carregar os indicadores'; return; }
+  const d = r.data;
+  el.innerHTML = `
+    <span class="status-pill pendente">pendentes: ${d.pendentes}</span>
+    <span class="status-pill em_andamento">em andamento: ${d.em_andamento}</span>
+    <span class="status-pill concluida">concluídas: ${d.concluidas}</span>
+    <span class="status-pill" style="border-color:var(--bad); color:var(--bad)">atrasadas: ${d.atrasadas}</span>
+    <span style="color:var(--dim)"> · total: ${d.total}</span>
+  `;
+}
+
+async function listarTarefas(){
+  if (!token){ document.getElementById('taskList').innerHTML = '<div class="empty">faça login primeiro</div>'; return; }
+  const r = await request('GET', '/tasks' + montarQueryFiltros());
+  const cont = document.getElementById('taskList');
+  if (!r.ok){ cont.innerHTML = '<div class="empty">não foi possível carregar as tarefas</div>'; return; }
+  const tarefas = r.data.tasks || [];
+  if (tarefas.length === 0){ cont.innerHTML = '<div class="empty">nenhuma tarefa ainda</div>'; return; }
+
+  cont.innerHTML = '';
+  tarefas.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'task';
+    div.innerHTML = `
+      <div class="top">
+        <div>
+          <div class="title">${t.title}</div>
+          <div class="meta">${t.description || ''}</div>
+          <div class="meta">
+            <span class="status-pill ${t.status}">${t.status}</span>
+            <span class="${t.priority}">● ${t.priority}</span>
+            ${t.responsible ? ' · resp: ' + t.responsible : ''}
+            ${t.due_date ? ' · prazo: ' + t.due_date.slice(0,10) : ''}
+          </div>
+        </div>
+      </div>
+      <div>
+        <select id="status-${t.id}">
+          <option value="pendente" ${t.status==='pendente'?'selected':''}>pendente</option>
+          <option value="em_andamento" ${t.status==='em_andamento'?'selected':''}>em_andamento</option>
+          <option value="concluida" ${t.status==='concluida'?'selected':''}>concluida</option>
+        </select>
+        <button class="small ghost" onclick="mudarStatus(${t.id})">aplicar status</button>
+        <button class="small ghost" onclick="verHistorico(${t.id})">histórico</button>
+        <button class="small danger" onclick="excluirTarefa(${t.id})">excluir</button>
+      </div>
+      <div class="history-box" id="hist-${t.id}"></div>
+    `;
+    cont.appendChild(div);
+  });
+}
+
+async function mudarStatus(id){
+  const status = document.getElementById('status-' + id).value;
+  const r = await request('PATCH', `/tasks/${id}/status`, { status });
+  if (r.ok){ listarTarefas(); carregarDashboard(); }
+}
+
+async function excluirTarefa(id){
+  if (!confirm('Excluir esta tarefa? Essa ação não pode ser desfeita.')) return;
+  const r = await request('DELETE', `/tasks/${id}`);
+  if (r.ok){ listarTarefas(); carregarDashboard(); }
+}
+
+async function verHistorico(id){
+  const box = document.getElementById('hist-' + id);
+  const aberto = box.classList.contains('open');
+  if (aberto){ box.classList.remove('open'); return; }
+  const r = await request('GET', `/tasks/${id}/history`);
+  if (!r.ok) return;
+  const itens = r.data.history || [];
+  box.innerHTML = itens.length
+    ? itens.map(h => `${new Date(h.changed_at).toLocaleString()} — ${h.field}: "${h.old_value ?? '—'}" → "${h.new_value}"`).join('<br>')
+    : 'sem alterações registradas ainda';
+  box.classList.add('open');
+}
+
+// INICIALIZAÇÃO DA SESSÃO AUTOMÁTICA AO CARREGAR O ARQUIVO
+inicializarSessao();
+</script>
+</body>
+</html>
