@@ -90,6 +90,15 @@ app.listen(PORT, () => {
   console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
 });
 
+app.get('/', (req, res) => {
+  res.send('O servidor está rodando com sucesso!');
+});
+
+// Se for uma API, você também pode testar se as rotas têm o prefixo correto, por exemplo:
+app.get('/api/teste', (req, res) => {
+  res.json({ mensagem: "API online" });
+});
+
 
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
@@ -101,5 +110,7 @@ if (process.env.NODE_ENV !== 'production') {
 // Obrigatório para a Vercel: ela importa este módulo e chama
 // app(req, res) diretamente, sem passar por app.listen.
 module.exports = app;
+
+
 
 
