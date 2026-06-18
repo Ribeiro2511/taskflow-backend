@@ -27,9 +27,9 @@ process.on('unhandledRejection', (err) => {
   console.error('💥 Promise rejeitada sem tratamento:', err);
 });
 
-const authRoutes      = require('./routes/authRoutes');
-const taskRoutes      = require('./routes/taskRoutes'); // Etapa 2
-const dashboardRoutes = require('./routes/dashboardRoutes'); // Etapa 3
+const authRoutes      = require('../src/routes/authRoutes');
+const taskRoutes      = require('../src/routes/taskRoutes'); // Etapa 2
+const dashboardRoutes = require('../src/routes/dashboardRoutes'); // Etapa 3
 
 const app  = express();
 
