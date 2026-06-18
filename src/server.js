@@ -79,23 +79,21 @@ app.use((err, _req, res, _next) => {
 });
 
 // ----------------------------------------------------------
-// Inicia o servidor
+// Inicia o servidor (somente fora da Vercel — lá quem chama
+// a função exportada é a própria plataforma, sem precisar
+// de listen em uma porta fixa)
 // ----------------------------------------------------------
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
-  console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
-});
-
 const PORT = process.env.PORT || 3000;
 
-// Só roda o listen se NÃO estiver na Vercel (ambiente local)
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-        console.log(`Servidor rodando localmente na porta ${PORT}`);
-    });
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    console.log(`   Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  });
 }
 
-// ISSO AQUI É OBRIGATÓRIO PARA A VERCEL:
+// Obrigatório para a Vercel: ela importa este módulo e chama
+// app(req, res) diretamente, sem passar por app.listen.
 module.exports = app;
 
 

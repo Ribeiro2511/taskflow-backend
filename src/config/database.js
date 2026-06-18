@@ -7,6 +7,11 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   user:     process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+  // A maioria dos bancos Postgres na nuvem (Neon, Supabase, Render...)
+  // exige conexão criptografada. Ative com DB_SSL=true nas variáveis
+  // de ambiente quando for usar um banco assim (não afeta o Postgres
+  // local, que continua sem SSL por padrão).
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
 // IMPORTANTE: sem este listener, qualquer erro assíncrono em uma
